@@ -1,0 +1,200 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==============================
+// Users & Addresses
+// ==============================
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  password    String
+  phoneNumber String   @unique
+  role        Role     @default(USER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  addresses     Address[]
+  orders        Order[]        @relation("UserOrders")
+  approvedOrders Order[]       @relation("ApprovedByAdmin")
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// เดิมเป็น array ฝังอยู่ใน User document (Mongo) — แยกเป็นตารางของตัวเองใน Postgres
+model Address {
+  id             String  @id @default(cuid())
+  userId         String
+  label          String  @default("Home")
+  recipientName  String?
+  phone          String?
+  addressLine    String?
+  lat            Float?
+  lng            Float?
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+// ==============================
+// Catalog: Category / Product
+// ==============================
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  defaultStock Int      @default(0)
+  price        Float
+  image        String
+  categoryId   String
+  isActive     Boolean  @default(true)
+  recommend    String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category     Category        @relation(fields: [categoryId], references: [id])
+  inventories  DailyInventory[]
+  orderItems   OrderItem[]
+
+  @@map("products")
+}
+
+// ==============================
+// Daily stock (เปิดจองล่วงหน้ารายวัน)
+// ==============================
+
+model DailyInventory {
+  id            String   @id @default(cuid())
+  date          String // YYYY-MM-DD (Asia/Bangkok)
+  productId     String
+  totalCapacity Int
+  reservedQty   Int      @default(0)
+  soldQty       Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@unique([date, productId])
+  @@map("daily_inventories")
+}
+
+// ==============================
+// Orders
+// ==============================
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  WAITING_FOR_VERIFICATION
+  READY_TO_PICKUP
+  DELIVERING
+  COMPLETED
+  CANCELLED
+}
+
+enum FulfillmentType {
+  PICKUP
+  DELIVERY
+}
+
+model Order {
+  id              String          @id @default(cuid())
+  userId          String
+  shortRef        String
+  totalPrice      Float
+  status          OrderStatus     @default(PENDING_PAYMENT)
+  expireAt        DateTime
+  fulfillmentType FulfillmentType
+  pickupDate      String // YYYY-MM-DD
+  shopNote        String          @default("")
+  note            String? // เหตุผลตอน reject
+  approvedAt      DateTime?
+  approvedById    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user            User            @relation("UserOrders", fields: [userId], references: [id])
+  approvedBy      User?           @relation("ApprovedByAdmin", fields: [approvedById], references: [id])
+  items           OrderItem[]
+  payment         OrderPayment?
+  deliveryInfo    OrderDeliveryInfo?
+
+  @@index([status, pickupDate])
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String
+  quantity     Int
+  priceAtTime  Float
+  customNote   String  @default("")
+  // เก็บ name/image ตอนสั่งซื้อไว้ (denormalized snapshot) เผื่อสินค้าเปลี่ยน/ถูกลบภายหลัง
+  name         String
+  image        String
+
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// เดิมฝังอยู่ใน Order.payment — แยกเป็น 1:1 relation ตามแบบ Hotel-Booking-System
+model OrderPayment {
+  id              String    @id @default(cuid())
+  orderId         String    @unique
+  slipImage       String?
+  transferDate    DateTime?
+  transferAmount  Float?
+  uploadedAt      DateTime?
+
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_payments")
+}
+
+// เดิมฝังอยู่ใน Order.delivery_info — เฉพาะตอน fulfillment_type = DELIVERY
+model OrderDeliveryInfo {
+  id             String  @id @default(cuid())
+  orderId        String  @unique
+  recipientName  String?
+  phone          String?
+  address        String?
+  riderNote      String?
+
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_delivery_infos")
+}
