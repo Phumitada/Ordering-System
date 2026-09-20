@@ -1,101 +1,158 @@
-# Ordering System (TypeScript / PostgreSQL)
+# Ordering System
 
-รีแฟคเตอร์จากโปรเจกต์ JavaScript + MongoDB ตัวเดิม (`Ordering_System`) มาเป็น TypeScript เต็มรูปแบบ
-โดยยึด **โครงสร้างและ pattern เดียวกับ `Hotel-Booking-System`** (routes/controllers/services/validation/types แยกชั้นชัดเจน,
-refresh-token auth, Prisma + PostgreSQL, docker-compose) — business logic เดิมทั้งหมดถูกย้ายมาโดยไม่มีอะไรหาย
-ยกเว้นจุดที่ระบุไว้ด้านล่างว่าตั้งใจแก้/ปรับปรุง
+A full-stack, end-to-end online ordering platform built with TypeScript, React, PostgreSQL, and Redis. This project is a complete architectural migration and feature extension of an earlier JavaScript/MongoDB implementation, redesigned around a layered backend architecture, relational data integrity, and a token-based authentication system.
 
-## โครงสร้าง
+## Table of Contents
+
+- [Overview](#overview)
+- [Technical Highlights](#technical-highlights)
+- [Technology Stack](#technology-stack)
+- [System Architecture](#system-architecture)
+- [Core Features](#core-features)
+- [Authentication and Security](#authentication-and-security)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Engineering Notes](#engineering-notes)
+
+## Overview
+
+The Ordering System is a two-sided e-commerce application supporting both customer-facing ordering workflows and an administrative back office. The platform manages the full order lifecycle, including daily inventory allocation, order placement, payment slip verification, and real-time order status tracking.
+
+This repository represents a ground-up migration of an earlier project from a JavaScript and MongoDB stack to a fully typed TypeScript stack backed by PostgreSQL, undertaken to improve data integrity, type safety, and maintainability. The migration preserved all original business logic while introducing a formal relational schema, a modern authentication model, and a set of previously unimplemented customer-facing features.
+
+## Technical Highlights
+
+- Migrated a MongoDB document model with embedded arrays (addresses, order items, payment and delivery information) to a normalized PostgreSQL relational schema using Prisma, enforcing referential integrity at the database level.
+- Replaced a single long-lived JWT stored in a cookie with a short-lived access token and refresh token pair, including server-side token invalidation on rotation and logout via Redis.
+- Identified and remediated an authorization gap in the original payment confirmation flow, where any authenticated user could attach a payment slip to another user's order by supplying its identifier. Ownership verification was added prior to processing.
+- Removed NoSQL-injection-oriented sanitization middleware (`express-mongo-sanitize`, `xss-clean`) that was no longer applicable once the data layer moved to Prisma's parameterized queries, reducing dependency surface without reducing security posture.
+- Implemented real-time order status propagation to authenticated customers via Socket.IO, scoped to per-user rooms, eliminating the need for client-side polling.
+- Extended the platform with a complete customer-facing ordering experience (menu browsing, cart, checkout, order history, and address management) built against an API that had previously only been exercised by the administrative interface.
+
+## Technology Stack
+
+**Frontend**
+- React with TypeScript, built using Vite
+- Tailwind CSS
+- Zustand for state management
+- Socket.IO client for real-time updates
+- Axios with interceptor-based token refresh
+
+**Backend**
+- Node.js with Express and TypeScript
+- PostgreSQL with Prisma ORM
+- Redis, used for refresh token invalidation
+- Socket.IO for server-to-client real-time events
+- JSON Web Tokens for authentication
+- Helmet, HPP, and rate limiting for baseline HTTP hardening
+
+**Infrastructure**
+- Docker Compose for local PostgreSQL and Redis provisioning
+
+## System Architecture
+
+The backend follows a layered architecture with a clear separation of concerns:
+
+```
+routes/       HTTP endpoint definitions
+controllers/  Request and response handling
+services/     Business logic and data access
+validation/   Request payload schema validation
+types/        Shared TypeScript type definitions
+```
+
+This structure was adopted to keep transport-layer concerns, business rules, and data access independently testable and maintainable as the system grows.
+
+## Core Features
+
+**Customer-facing**
+- Menu browsing with category filtering, search, and live daily stock availability
+- Shopping cart bound to a single pickup date, reflecting the system's per-day inventory model
+- Checkout supporting both pickup and delivery fulfillment, with saved delivery addresses
+- Order history and a detailed order view with a live payment countdown, slip upload, and real-time status updates
+- Account profile management, including saved address management
+
+**Administrative**
+- Dashboard with order and revenue summaries
+- Product management, including category assignment and reassignment
+- Category management
+- Daily inventory management, with per-day stock capacity control
+- Order approval and fulfillment workflows, including real-time order intake
+- Customer and role management
+
+## Authentication and Security
+
+The system uses a short-lived access token and long-lived refresh token model:
+
+```
+Login/Register  ->  Access token (15 min, returned in response body, sent as a Bearer header)
+                     Refresh token (7 days, HTTP-only cookie)
+
+On each request  ->  Access token attached automatically via request interceptor
+
+On expiry (401)  ->  Client interceptor calls POST /auth/refresh (refresh cookie)
+                      New access token issued and the original request retried automatically
+
+On logout        ->  Refresh token invalidated in Redis
+```
+
+Passwords are hashed prior to storage. Authorization checks are enforced at the route level for administrative endpoints and at the resource level for user-owned data (for example, order and address ownership).
+
+## Project Structure
 
 ```
 Ordering-System/
-├── client/     # React + TypeScript + Vite + Tailwind (UI style เดิมทุกจุด: สี, ฟอนต์ Prompt/Kanit)
-├── server/     # Express + TypeScript + Prisma + PostgreSQL + Redis
-└── docker-compose.yml   # Postgres + Redis (เหมือน Hotel-Booking-System)
+├── client/               React, TypeScript, Vite, Tailwind CSS
+├── server/               Express, TypeScript, Prisma, PostgreSQL, Redis
+└── docker-compose.yml    Local PostgreSQL and Redis services
 ```
 
-## เริ่มใช้งาน
+## Getting Started
+
+### Prerequisites
+
+- Node.js
+- Docker and Docker Compose
+
+### 1. Start dependent services
 
 ```bash
-# 1. ขึ้น Postgres + Redis
 docker compose up -d
+```
 
-# 2. Backend
+### 2. Backend setup
+
+```bash
 cd server
-cp .env.example .env      # แก้ DATABASE_URL, JWT secrets, Cloudinary keys ให้ครบ
+cp .env.example .env
+# Configure DATABASE_URL, JWT secrets, and Cloudinary credentials
+
 npm install
 npx prisma generate
 npx prisma migrate dev --name init
-npm run seed               # สร้าง admin@example.com / Admin123! + หมวดหมู่/สินค้าตัวอย่าง
-npm run dev                 # http://localhost:5000
+npm run seed     # creates a sample administrator account and sample catalog data
+npm run dev       # starts the API server
+```
 
-# 3. Frontend
-cd ../client
+### 3. Frontend setup
+
+```bash
+cd client
 cp .env.example .env
+
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev       # starts the development server
 ```
 
-> **หมายเหตุ:** ใน sandbox ที่ใช้ generate โปรเจกต์นี้ให้ ไม่สามารถรัน `npx prisma generate` ได้จริง
-> เพราะ network ปิดไม่ให้ต่อ `binaries.prisma.sh` (ที่เก็บ engine binary ของ Prisma) — โค้ดฝั่ง TypeScript
-> ผ่าน type-check ทั้งหมดแล้ว (ใช้ stub client ชั่วคราวตรวจสอบ) แต่ยังไม่เคยรัน `prisma generate` จริงกับ schema นี้
-> รบกวนรันคำสั่งนี้เป็นขั้นตอนแรกบนเครื่อง/VPS ของ Ham เอง แล้วค่อยรัน `migrate dev`
+## Engineering Notes
 
-## สิ่งที่เปลี่ยนจากของเดิม
+The following items were identified and deliberately addressed during the migration, rather than being defects introduced by it:
 
-| เดิม (JS + Mongo) | ใหม่ (TS + Postgres) |
-|---|---|
-| `backend/` `frontend/` | `server/` `client/` (ชื่อตาม Hotel-Booking-System) |
-| Mongoose schema | Prisma schema (`server/prisma/schema.prisma`) — embedded array/object ทุกตัว (`addresses`, `order.items`, `order.payment`, `order.delivery_info`) แยกเป็นตารางความสัมพันธ์ปกติ |
-| JWT เดี่ยวใน cookie อายุ 20 วัน | Access token (15 นาที, ส่งใน response body + header `Authorization`) + Refresh token (7 วัน, httpOnly cookie) + blacklist ผ่าน Redis ตอน rotate/logout |
-| `_id` (ObjectId) | `id` (cuid) — field ทุกจุดใน frontend/backend เปลี่ยนตาม |
-| `category_id`, `is_active`, `default_stock`, `total_price`, ... (snake_case) | `categoryId`, `isActive`, `defaultStock`, `totalPrice`, ... (camelCase ตาม Prisma convention) |
-| express-mongo-sanitize / xss-clean / perfect-express-sanitizer | ตัดออก — ความเสี่ยง NoSQL-injection หมดไปเพราะ Prisma ใช้ parameterized query อยู่แล้ว (helmet + hpp + rate-limit ยังอยู่เหมือนเดิม) |
+1. **Order status event emission.** The frontend contained an event listener for order status updates that the original backend never emitted. Emission was added to all relevant order state transitions (approval, rejection, and status update).
+2. **Unused administrative routes.** Controller functions for user role management and user deletion existed in the original codebase but were never exposed via a route. These were wired up and exposed as authenticated administrative endpoints.
+3. **Dead code in dashboard statistics.** A status value referenced in dashboard aggregation logic did not correspond to any value in the order status enumeration and was removed.
+4. **Referential integrity on product deletion.** The original data model allowed products referenced by existing orders to be deleted outright, resulting in orphaned references. The relational schema enforces foreign key constraints, preventing deletion of products with associated orders.
 
-## ฟีเจอร์ใหม่ที่เพิ่มเข้ามา (ไม่มีในต้นฉบับเลย)
+---
 
-ต้นฉบับ build แต่ฝั่ง **Admin** เท่านั้น — ฝั่งลูกค้า (`pages/client/Home.jsx`) มีแค่ `<Navbar />` เปล่าๆ ทั้งที่ backend
-มี API สั่งซื้อ/จ่ายเงินพร้อมอยู่แล้ว รอบนี้เติมให้ครบทั้งสองฝั่งจนใช้งานเป็นระบบสั่งซื้อได้จริง end-to-end:
-
-**Backend**
-- `Address` module ครบ (`GET/POST/PATCH/DELETE /api/addresses`) — เดิมมี field `addresses` ใน User schema แต่ไม่เคยมี route ใช้งานเลย
-- `GET /api/order/my` — ประวัติคำสั่งซื้อของตัวเอง (เดิมไม่มี endpoint นี้เลย)
-- `GET /api/order/:id` — ดูออเดอร์เดี่ยว พร้อมกันสิทธิ์ (เจ้าของออเดอร์ หรือ admin เท่านั้น)
-- **แก้ช่องโหว่**: `confirmPayment` (แนบสลิป) เดิมไม่เช็คเจ้าของออเดอร์เลย — ลูกค้าคนอื่นที่ login อยู่แนบสลิปให้ order คนอื่นได้ถ้ารู้ id ตอนนี้เช็คแล้วว่า `order.userId === req.user.userId` ก่อนอนุญาต
-- Socket.io: ลูกค้าที่ login เข้า room `user:{userId}` ของตัวเอง รับ event `myOrderUpdated` แบบ real-time ทุกครั้งที่สถานะออเดอร์เปลี่ยน (สร้าง/จ่ายเงิน/อนุมัติ/ปฏิเสธ/เปลี่ยนสถานะ) — ไม่ต้อง poll เอง
-
-**Frontend**
-- `/menu` — เลือกวันที่รับของ + filter หมวดหมู่/ค้นหา + เช็ค stock รายวันจริงก่อนกดสั่ง
-- `/cart` — ตะกร้า (ผูกกับวันที่รับของ 1 วันเสมอ เพราะสต็อกเปิดแยกรายวัน — เปลี่ยนวันที่ = เตือนก่อนล้างตะกร้า)
-- `/checkout` — เลือกรับที่ร้าน/จัดส่ง, เลือก/เพิ่มที่อยู่จัดส่ง, โน้ตถึงร้าน, ยิง `POST /order` จริง
-- `/my-orders`, `/my-orders/:id` — ประวัติคำสั่งซื้อ + หน้ารายละเอียดที่มี **นับถอยหลัง 10 นาทีให้จ่ายเงิน**, อัปโหลดสลิป, และอัปเดตสถานะ **real-time ผ่าน socket** โดยไม่ต้อง refresh
-- `/profile` — ดูข้อมูลบัญชี + จัดการที่อยู่จัดส่ง (เพิ่ม/ลบ)
-- `RequireAuth` guard ใหม่ — ต่างจาก `ProtectedRoute` (admin-only เดิม) ใช้กับหน้าลูกค้าทั่วไปที่แค่ต้อง login
-
-## บั๊ก/จุดที่ปรับแก้ระหว่างพอร์ต (ตั้งใจ ไม่ใช่พอร์ตผิด)
-
-1. **`orderUpdated` socket event** — เดิม frontend (`useOrderStore.js`) มี listener ดักฟัง event นี้ไว้แล้ว แต่ backend เดิมไม่เคย `emit` เลยสักจุด (approve/reject/updateStatus ไม่ได้ยิง event) ตอนนี้ยิงครบทั้ง 3 จุดแล้ว
-2. **`updateUserRole` / `deleteUser`** — มี controller function อยู่แล้วในไฟล์เดิมแต่ไม่เคยถูกผูก route เลย เพิ่ม route ให้ใช้งานได้จริงที่ `PATCH /api/users/:id/role` และ `DELETE /api/users/:id`
-3. **Dashboard stats** — เดิมเช็ค `status === 'PAID'` ร่วมกับ `COMPLETED` แต่ enum จริงไม่มีสถานะ `PAID` อยู่เลย (dead code) — ตัดทิ้ง เหลือเช็คแค่ `COMPLETED`
-4. **ปุ่ม "ดูทั้งหมด" ใน Dashboard** — เดิมไม่มี `onClick` เลย (กดไม่ได้) ตอนนี้พาไปหน้า Approve Orders
-5. **ลบสินค้าที่มีออเดอร์ค้างอยู่** — Mongo เดิมไม่มี referential integrity เลยลบสินค้าที่ถูกสั่งซื้อไปแล้วได้เฉยๆ (ทำให้ order เก่าข้อมูลขาด) ตอนนี้ Postgres FK จะกันไว้ (ลบไม่ได้ถ้ามี order อ้างถึงอยู่) — เป็นการปรับปรุงด้าน data-integrity ไม่ใช่ regression
-
-## UI/UX
-
-Client ยังคงสไตล์เดิมทุกจุดตามที่ขอ: สี primary `#A4161A` / secondary `#FBC02D` / dark `#374151`,
-ฟอนต์ Prompt (body) + Kanit (heading), zustand + Tailwind + lucide-react + react-hot-toast + socket.io-client เหมือนเดิม
-หน้า/component ที่พอร์ตมาครบ: Login/Register (split-screen), Admin Dashboard, Products (list + add + edit),
-Category (+ ย้ายสินค้าข้ามหมวด), Daily Inventory, Orders (Approve / Active/Kitchen), Customers
-
-หน้า client-facing (หน้าร้านลูกค้าเต็มรูปแบบ) เดิมก็เป็นแค่ placeholder อยู่แล้ว (`pages/client/Home.jsx` มี Navbar ตัวเดียว)
-เลยคงสภาพเดิมไว้ — โฟกัสหลักคือฝั่ง Admin ที่มี business logic ครบ ตามจุดประสงค์ที่จะใช้ทดสอบระบบ PaaS
-
-## Auth flow (refresh token)
-
-```
-Login/Register → accessToken (15m, เก็บใน zustand + localStorage) + refreshToken (7d, httpOnly cookie)
-ทุก request แนบ accessToken เป็น Bearer header อัตโนมัติ (api/client.ts)
-เมื่อ accessToken หมดอายุ → 401 → interceptor เรียก POST /auth/refresh (ใช้ cookie) → ได้ accessToken ใหม่ → retry request เดิมอัตโนมัติ
-Logout → refreshToken เดิมถูก blacklist ใน Redis
-```
-testing for webhook
+This project was developed as an independent portfolio exercise in system migration, backend architecture, and full-stack application design.

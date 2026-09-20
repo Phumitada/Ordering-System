@@ -67,6 +67,7 @@ app.use('/api/order', orderRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/addresses', addressRoutes)
+app.set('trust proxy', 1)
 
 initStockOpenCron()
 initAutoCancelCron()
