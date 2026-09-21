@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Navbar from '@/components/client/Navbar'
 import ProductCard from '@/components/client/ProductCard'
 import ModernDatePicker from '@/components/ui/ModernDatePicker'
@@ -16,10 +17,12 @@ const Menu = () => {
   const { categories, getCategories } = useCategoryStore()
   const { pickupDate, setPickupDate, items: cartItems } = useCartStore()
 
+  const [searchParams] = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState('')
+  // รองรับลิงก์เข้าตรงจากหน้าแรกพร้อมหมวดหมู่ เช่น /menu?category=xxx
+  const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('category') || '')
   const [search, setSearch] = useState('')
 
   useEffect(() => {

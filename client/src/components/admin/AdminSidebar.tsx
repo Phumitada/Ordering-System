@@ -14,6 +14,8 @@ import {
   CircleCheckBig,
   ChevronLeft,
   ChevronRight,
+  Megaphone,
+  Newspaper,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import Logo from '../ui/Logo'
@@ -46,6 +48,12 @@ const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
     },
     {
       items: [{ icon: Users, label: 'Customer (ข้อมูลลูกค้า)', path: '/secret-dashboard/customers' }],
+    },
+    {
+      items: [
+        { icon: Megaphone, label: 'Promotions (โปรโมชั่น)', path: '/secret-dashboard/promotions-admin' },
+        { icon: Newspaper, label: 'Blog (บทความ)', path: '/secret-dashboard/blog-admin' },
+      ],
     },
   ]
 
