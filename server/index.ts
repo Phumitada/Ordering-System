@@ -14,6 +14,9 @@ import inventoryRoutes from './routes/inventory.routes'
 import orderRoutes from './routes/order.routes'
 import userRoutes from './routes/user.routes'
 import addressRoutes from './routes/address.routes'
+import settingsRoutes from './routes/settings.routes'
+import promotionRoutes from './routes/promotion.routes'
+import blogRoutes from './routes/blog.routes'
 
 import { initSocket, io } from './socket/socket'
 import { initAutoCancelCron } from './cron/cancel.cron'
@@ -67,6 +70,9 @@ app.use('/api/order', orderRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/addresses', addressRoutes)
+app.use('/api/settings', settingsRoutes)
+app.use('/api/promotions', promotionRoutes)
+app.use('/api/blogs', blogRoutes)
 app.set('trust proxy', 1)
 
 initStockOpenCron()

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch index.ts",
+    "dev": "tsx seeds/seed.ts && tsx watch index.ts",
     "build": "echo 'no build needed'",
     "start": "tsx index.ts",
     "studio": "prisma studio",

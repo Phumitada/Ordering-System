@@ -7,7 +7,8 @@ import { createCategorySchema, updateCategorySchema } from '../validation/catego
 const router = Router()
 
 router.post('/', authenticate, authorize('ADMIN'), validate(createCategorySchema), categoryController.create)
-router.get('/', authenticate, authorize('ADMIN'), categoryController.list)
+// public — หน้าเมนูของลูกค้า (ไม่ต้อง login) ใช้ endpoint นี้แสดงปุ่มกรองหมวดหมู่
+router.get('/', categoryController.list)
 router.patch('/:id', authenticate, authorize('ADMIN'), validate(updateCategorySchema), categoryController.update)
 router.delete('/:id', authenticate, authorize('ADMIN'), categoryController.remove)
 

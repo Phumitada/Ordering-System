@@ -198,3 +198,52 @@ model OrderDeliveryInfo {
 
   @@map("order_delivery_infos")
 }
+
+// ==============================
+// Shop content: Settings / Promotions / Blog
+// ==============================
+
+// Singleton row (fixed id) — ตั้งค่าร้านที่โชว์หน้า Contact + ผูกกับหน้า Settings ฝั่ง admin
+model ShopSetting {
+  id          String   @id @default("shop-settings")
+  shopName    String   @default("Siri Bakery")
+  phoneNumber String   @default("")
+  email       String   @default("")
+  address     String   @default("")
+  openTime    String   @default("")
+  closeTime   String   @default("")
+  facebookUrl String   @default("")
+  lineId      String   @default("")
+  description String   @default("")
+  updatedAt   DateTime @updatedAt
+
+  @@map("shop_settings")
+}
+
+model Promotion {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  image       String
+  badgeText   String   @default("")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("promotions")
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  coverImage  String
+  excerpt     String   @default("")
+  content     String
+  isPublished Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("blog_posts")
+}
